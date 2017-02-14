@@ -8,23 +8,28 @@
 
 /* Begin PBXBuildFile section */
 		E3E204081E53434F00EA9813 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E3E204071E53434F00EA9813 /* main.cpp */; };
+		E3E204101E53436000EA9813 /* kernels.cl in Sources */ = {isa = PBXBuildFile; fileRef = E3E2040F1E53436000EA9813 /* kernels.cl */; };
+		E3E204111E5343A600EA9813 /* kernels.cl in CopyFiles */ = {isa = PBXBuildFile; fileRef = E3E2040F1E53436000EA9813 /* kernels.cl */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
 		E3E204021E53434F00EA9813 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
+			buildActionMask = 12;
+			dstPath = "";
+			dstSubfolderSpec = 16;
 			files = (
+				E3E204111E5343A600EA9813 /* kernels.cl in CopyFiles */,
 			);
-			runOnlyForDeploymentPostprocessing = 1;
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		E3E204041E53434F00EA9813 /* TCPServerThreaded */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = TCPServerThreaded; sourceTree = BUILT_PRODUCTS_DIR; };
 		E3E204071E53434F00EA9813 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		E3E2040E1E53436000EA9813 /* cl.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = cl.hpp; sourceTree = "<group>"; };
+		E3E2040F1E53436000EA9813 /* kernels.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; path = kernels.cl; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -57,6 +62,8 @@
 		E3E204061E53434F00EA9813 /* TCPServerThreaded */ = {
 			isa = PBXGroup;
 			children = (
+				E3E2040E1E53436000EA9813 /* cl.hpp */,
+				E3E2040F1E53436000EA9813 /* kernels.cl */,
 				E3E204071E53434F00EA9813 /* main.cpp */,
 			);
 			path = TCPServerThreaded;
@@ -120,6 +127,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E3E204081E53434F00EA9813 /* main.cpp in Sources */,
+				E3E204101E53436000EA9813 /* kernels.cl in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
