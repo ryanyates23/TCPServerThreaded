@@ -66,7 +66,7 @@ void TCPReceive(void)
     int n;
     
     
-    //while(1)
+    for(;;)
     {
         totalBytesRead = 0;
         if(rHead == 0)
@@ -96,8 +96,10 @@ void TCPReceive(void)
                 totalBytesRead += n;
             }
         }
+        rHead = (++rHead) % NUM_BUFFERS;
+        std::cout << "HEAD: " << rHead << std::endl;
     }
-    rHead = (++rHead) % NUM_BUFFERS;
+    
     
 }
 
@@ -109,7 +111,7 @@ int main(int argc, char *argv[])
     //    char *argv = "localhost";
     int x, y;
     //int displayFrame = 0;
-    int filterType = 3; //0 = none, 1 = 3x3mean, 2 = 3x3 median, 3 = 5x5 median, 4 = 3x3median 2 pass
+    int filterType = 0; //0 = none, 1 = 3x3mean, 2 = 3x3 median, 3 = 5x5 median, 4 = 3x3median 2 pass
     int enSobelEdge = 1;
     int enBinarise = 0;
     int enCombine = 0;
@@ -271,7 +273,8 @@ int main(int argc, char *argv[])
     if (receiveSocket < 0)
         error("ERROR on accept");
     
-    
+    //Start threads
+    std::thread ReceiveThread(TCPReceive);
     
     
     while(1)
@@ -281,7 +284,6 @@ int main(int argc, char *argv[])
 //        std::thread receiveThread(TCPReceive, receiveSocket, receiveBuffer[0]);
 //        receiveThread.join();
         std::cout << "wPoint: " << rHead << " rPoint: " << rTail << std::endl;
-        TCPReceive();
         
         
         
