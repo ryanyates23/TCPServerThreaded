@@ -19,10 +19,24 @@
 #define WIDTH 1280
 #define HEIGHT 720
 
+#define NUM_BUFFERS 3
+
 //#define WIDTH 1024
 //#define HEIGHT 576
 
 //using namespace std;
+
+//global variables between threads
+
+unsigned char rBuf1[WIDTH*HEIGHT];
+unsigned char rBuf2[WIDTH*HEIGHT];
+unsigned char rBuf3[WIDTH*HEIGHT];
+int rHead, rTail;
+
+
+
+int sockfr, sockfs, receiveSocket, sendSocket, portnoR, portnoS;
+
 
 void error(const char *msg)
 {
@@ -45,20 +59,46 @@ void TCPSend(int socket, unsigned char* buffer)
     }
 }
 
-void TCPReceive(int socket, unsigned char* buffer)
+void TCPReceive(void)
 {
     int totalBytesRead = 0;
     int vecSize = WIDTH*HEIGHT;
-    bzero(buffer,vecSize);
     int n;
-    totalBytesRead = 0;
-    while(totalBytesRead != vecSize)
+    
+    
+    //while(1)
     {
-        n = (int)read(socket,&buffer[totalBytesRead],vecSize - totalBytesRead);
-        if (n < 0) error("ERROR reading from socket");
-        
-        totalBytesRead += n;
+        totalBytesRead = 0;
+        if(rHead == 0)
+        {
+            while(totalBytesRead != vecSize)
+            {
+                n = (int)read(receiveSocket,&rBuf1[totalBytesRead],vecSize - totalBytesRead);
+                if (n < 0) error("ERROR reading from socket");
+                totalBytesRead += n;
+            }
+        }
+        else if(rHead == 1)
+        {
+            while(totalBytesRead != vecSize)
+            {
+                n = (int)read(receiveSocket,&rBuf2[totalBytesRead],vecSize - totalBytesRead);
+                if (n < 0) error("ERROR reading from socket");
+                totalBytesRead += n;
+            }
+        }
+        else if(rHead == 2)
+        {
+            while(totalBytesRead != vecSize)
+            {
+                n = (int)read(receiveSocket,&rBuf3[totalBytesRead],vecSize - totalBytesRead);
+                if (n < 0) error("ERROR reading from socket");
+                totalBytesRead += n;
+            }
+        }
     }
+    rHead = (++rHead) % NUM_BUFFERS;
+    
 }
 
 
@@ -81,12 +121,14 @@ int main(int argc, char *argv[])
     float mean, thresh;
     float threshFactor = 0.25;
     float fps;
+    rHead = 0;
+    rTail = 0;
     
     
     
     
     //--------------OPENCV INIT---------------//
-    unsigned char receiveBuffer[WIDTH*HEIGHT];
+    unsigned char receiveBuffer[NUM_BUFFERS][WIDTH*HEIGHT];
     unsigned char sendBuffer[WIDTH*HEIGHT];
     int vecSize = WIDTH*HEIGHT;
     std::vector<unsigned char> h_frame_in(vecSize);
@@ -179,9 +221,11 @@ int main(int argc, char *argv[])
     
     //------------TCP SERVER INIT--------------//
 
-    int sockfr, sockfs, receiveSocket, sendSocket, portnoR, portnoS;
+//    int sockfr, sockfs, receiveSocket, sendSocket, portnoR, portnoS;
     socklen_t clilen;
     //char buffer[256];
+    
+    //set up socket to recieve frames on
     struct sockaddr_in serv_addr, cli_addr;
     if (argc < 2) {
         fprintf(stderr,"ERROR, no port provided\n");
@@ -207,7 +251,7 @@ int main(int argc, char *argv[])
     if (receiveSocket < 0)
         error("ERROR on accept");
     
-    
+    //set up socket to send frames on
     sockfs = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfs < 0)
         error("ERROR Opening Socket");
@@ -234,23 +278,48 @@ int main(int argc, char *argv[])
     {
         
         //--------------------TCP RECEIVE----------------//
-        std::thread receiveThread(TCPReceive, receiveSocket, receiveBuffer);
-        //receiveThread.join();
+//        std::thread receiveThread(TCPReceive, receiveSocket, receiveBuffer[0]);
+//        receiveThread.join();
+        std::cout << "wPoint: " << rHead << " rPoint: " << rTail << std::endl;
+        TCPReceive();
+        
         
         
         //---------------DISPLAY FRAME------------------//
         
         //----------------PROCESSING----------------------//
         std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-        
-        for (y = 0; y < HEIGHT; y++)
+        if(rTail == 0)
         {
-            for (x = 0; x < WIDTH-1; x++)
+            for (y = 0; y < HEIGHT; y++)
             {
-                //std::cout << "Accessing Element: " << (y*WIDTH+x) << std::endl;
-                h_frame_in[y*WIDTH + x] = receiveBuffer[y*WIDTH + x];
+                for (x = 0; x < WIDTH-1; x++)
+                {
+                    h_frame_in[y*WIDTH + x] = rBuf1[y*WIDTH + x];
+                }
             }
         }
+        else if(rTail == 1)
+        {
+            for (y = 0; y < HEIGHT; y++)
+            {
+                for (x = 0; x < WIDTH-1; x++)
+                {
+                    h_frame_in[y*WIDTH + x] = rBuf2[y*WIDTH + x];
+                }
+            }
+        }
+        else if(rTail == 2)
+        {
+            for (y = 0; y < HEIGHT; y++)
+            {
+                for (x = 0; x < WIDTH-1; x++)
+                {
+                    h_frame_in[y*WIDTH + x] = rBuf3[y*WIDTH + x];
+                }
+            }
+        }
+        rTail = (++rTail) % 3;
         
         
         
@@ -416,8 +485,7 @@ int main(int argc, char *argv[])
         std::cout << fps << std::endl;
         
         //----------------TCP Send------------------------//
-        std::thread sendThread(TCPSend, sendSocket, sendBuffer);
-        //sendThread.join();
+        TCPSend(sendSocket, sendBuffer);
         
         
         //------------------------------------------------//
