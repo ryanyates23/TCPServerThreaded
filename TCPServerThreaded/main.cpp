@@ -31,7 +31,12 @@
 unsigned char rBuf1[WIDTH*HEIGHT];
 unsigned char rBuf2[WIDTH*HEIGHT];
 unsigned char rBuf3[WIDTH*HEIGHT];
-int rHead, rTail;
+int rHead, rTail, rCount;
+
+unsigned char sBuf1[WIDTH*HEIGHT];
+unsigned char sBuf2[WIDTH*HEIGHT];
+unsigned char sBuf3[WIDTH*HEIGHT];
+int sHead, sTail, sCount;
 
 
 
@@ -44,18 +49,54 @@ void error(const char *msg)
     exit(1);
 }
 
-void TCPSend(int socket, unsigned char* buffer)
+void TCPSend(void)
 {
     int totalBytesWritten = 0;
     int vecSize = WIDTH*HEIGHT;
     int n;
-    while(totalBytesWritten != vecSize)
+    
+    for(;;)
     {
-        n = (int)write(socket,&buffer[totalBytesWritten],vecSize);
-        //cout << "Bytes Written: " << n << endl;
-        if (n < 0)
-            error("ERROR writing to socket");
-        totalBytesWritten += n;
+        //if(sCount > 0)
+        {
+            totalBytesWritten = 0;
+            if(sTail == sHead) sTail = (++sTail) % NUM_BUFFERS;
+            if(sTail == 0)
+            {
+                while(totalBytesWritten != vecSize)
+                {
+                    n = (int)write(sendSocket,&sBuf1[totalBytesWritten],vecSize);
+                    //cout << "Bytes Written: " << n << endl;
+                    if (n < 0)
+                        error("ERROR writing to socket");
+                    totalBytesWritten += n;
+                }
+            }
+            else if(sTail == 1)
+            {
+                while(totalBytesWritten != vecSize)
+                {
+                    n = (int)write(sendSocket,&sBuf2[totalBytesWritten],vecSize);
+                    //cout << "Bytes Written: " << n << endl;
+                    if (n < 0)
+                        error("ERROR writing to socket");
+                    totalBytesWritten += n;
+                }
+            }
+            else if(sTail == 2)
+            {
+                while(totalBytesWritten != vecSize)
+                {
+                    n = (int)write(sendSocket,&sBuf3[totalBytesWritten],vecSize);
+                    //cout << "Bytes Written: " << n << endl;
+                    if (n < 0)
+                        error("ERROR writing to socket");
+                    totalBytesWritten += n;
+                }
+            }
+            sTail = (++sTail) % NUM_BUFFERS;
+            sCount--;
+        }
     }
 }
 
@@ -69,7 +110,8 @@ void TCPReceive(void)
     for(;;)
     {
         totalBytesRead = 0;
-        if(rHead == 0)
+        if(rHead == rTail) rHead = (++rHead) % NUM_BUFFERS;
+        if(rHead == 0 )
         {
             while(totalBytesRead != vecSize)
             {
@@ -111,7 +153,7 @@ int main(int argc, char *argv[])
     //    char *argv = "localhost";
     int x, y;
     //int displayFrame = 0;
-    int filterType = 0; //0 = none, 1 = 3x3mean, 2 = 3x3 median, 3 = 5x5 median, 4 = 3x3median 2 pass
+    int filterType = 3; //0 = none, 1 = 3x3mean, 2 = 3x3 median, 3 = 5x5 median, 4 = 3x3median 2 pass
     int enSobelEdge = 1;
     int enBinarise = 0;
     int enCombine = 0;
@@ -222,8 +264,8 @@ int main(int argc, char *argv[])
     
     
     //------------TCP SERVER INIT--------------//
-
-//    int sockfr, sockfs, receiveSocket, sendSocket, portnoR, portnoS;
+    
+    //    int sockfr, sockfs, receiveSocket, sendSocket, portnoR, portnoS;
     socklen_t clilen;
     //char buffer[256];
     
@@ -248,8 +290,8 @@ int main(int argc, char *argv[])
     listen(sockfr,5);
     clilen = sizeof(cli_addr);
     receiveSocket = accept(sockfr,
-                       (struct sockaddr *) &cli_addr,
-                       &clilen);
+                           (struct sockaddr *) &cli_addr,
+                           &clilen);
     if (receiveSocket < 0)
         error("ERROR on accept");
     
@@ -268,21 +310,22 @@ int main(int argc, char *argv[])
     listen(sockfs, 5);
     clilen = sizeof(cli_addr);
     sendSocket = accept(sockfs,
-                           (struct sockaddr *) &cli_addr,
-                           &clilen);
+                        (struct sockaddr *) &cli_addr,
+                        &clilen);
     if (receiveSocket < 0)
         error("ERROR on accept");
     
     //Start threads
     std::thread ReceiveThread(TCPReceive);
+    std::thread SendThread(TCPSend);
     
     
     while(1)
     {
         
         //--------------------TCP RECEIVE----------------//
-//        std::thread receiveThread(TCPReceive, receiveSocket, receiveBuffer[0]);
-//        receiveThread.join();
+        //        std::thread receiveThread(TCPReceive, receiveSocket, receiveBuffer[0]);
+        //        receiveThread.join();
         std::cout << "wPoint: " << rHead << " rPoint: " << rTail << std::endl;
         
         
@@ -291,6 +334,7 @@ int main(int argc, char *argv[])
         
         //----------------PROCESSING----------------------//
         std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+        if(rTail == rHead) rTail = (++rTail) % NUM_BUFFERS;
         if(rTail == 0)
         {
             for (y = 0; y < HEIGHT; y++)
@@ -470,15 +514,39 @@ int main(int argc, char *argv[])
             queue.enqueueReadBuffer(d_frame_out, CL_TRUE, 0, sizeof(unsigned char)*h_frame_out.size(), h_frame_out.data());
         }
         
-        
-        
-        for (y = 0; y < HEIGHT; y++)
+        if(sHead == sTail) sHead = (++sHead) % NUM_BUFFERS;
+        if(sHead == 0)
         {
-            for (x = 0; x < WIDTH-1; x++)
+            for (y = 0; y < HEIGHT; y++)
             {
-                sendBuffer[y*WIDTH + x] = h_frame_out[y*WIDTH + x];
+                for (x = 0; x < WIDTH-1; x++)
+                {
+                    sBuf1[y*WIDTH + x] = h_frame_out[y*WIDTH + x];
+                }
             }
         }
+        else if(sHead == 1)
+        {
+            for (y = 0; y < HEIGHT; y++)
+            {
+                for (x = 0; x < WIDTH-1; x++)
+                {
+                    sBuf2[y*WIDTH + x] = h_frame_out[y*WIDTH + x];
+                }
+            }
+        }
+        else if(sHead == 2)
+        {
+            for (y = 0; y < HEIGHT; y++)
+            {
+                for (x = 0; x < WIDTH-1; x++)
+                {
+                    sBuf3[y*WIDTH + x] = h_frame_out[y*WIDTH + x];
+                }
+            }
+        }
+        sHead = (++sHead) % NUM_BUFFERS;
+        sCount++;
         
         std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2-t1).count();
@@ -487,7 +555,7 @@ int main(int argc, char *argv[])
         std::cout << fps << std::endl;
         
         //----------------TCP Send------------------------//
-        TCPSend(sendSocket, sendBuffer);
+        //TCPSend();
         
         
         //------------------------------------------------//
