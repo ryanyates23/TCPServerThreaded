@@ -38,6 +38,9 @@ unsigned char sBuf2[WIDTH*HEIGHT];
 unsigned char sBuf3[WIDTH*HEIGHT];
 int sHead, sTail, sCount;
 
+std::mutex rMut1, rMut2, rMut3;
+std::mutex sMut1, sMut2, sMut3;
+
 
 
 int sockfr, sockfs, receiveSocket, sendSocket, portnoR, portnoS;
