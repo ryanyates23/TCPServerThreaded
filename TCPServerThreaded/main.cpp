@@ -63,9 +63,10 @@ void TCPSend(void)
         //if(sCount > 0)
         {
             totalBytesWritten = 0;
-            if(sTail == sHead) sTail = (++sTail) % NUM_BUFFERS;
+            //if(sTail == sHead) sTail = (++sTail) % NUM_BUFFERS;
             if(sTail == 0)
             {
+                sMut1.lock();
                 while(totalBytesWritten != vecSize)
                 {
                     n = (int)write(sendSocket,&sBuf1[totalBytesWritten],vecSize);
@@ -74,9 +75,11 @@ void TCPSend(void)
                         error("ERROR writing to socket");
                     totalBytesWritten += n;
                 }
+                sMut1.unlock();
             }
             else if(sTail == 1)
             {
+                sMut2.lock();
                 while(totalBytesWritten != vecSize)
                 {
                     n = (int)write(sendSocket,&sBuf2[totalBytesWritten],vecSize);
@@ -85,9 +88,11 @@ void TCPSend(void)
                         error("ERROR writing to socket");
                     totalBytesWritten += n;
                 }
+                sMut2.unlock();
             }
             else if(sTail == 2)
             {
+                sMut3.lock();
                 while(totalBytesWritten != vecSize)
                 {
                     n = (int)write(sendSocket,&sBuf3[totalBytesWritten],vecSize);
@@ -96,6 +101,7 @@ void TCPSend(void)
                         error("ERROR writing to socket");
                     totalBytesWritten += n;
                 }
+                sMut3.unlock();
             }
             sTail = (++sTail) % NUM_BUFFERS;
             sCount--;
@@ -113,36 +119,41 @@ void TCPReceive(void)
     for(;;)
     {
         totalBytesRead = 0;
-        if(rHead == rTail) rHead = (++rHead) % NUM_BUFFERS;
+        //if(rHead == rTail) rHead = (++rHead) % NUM_BUFFERS;
         if(rHead == 0 )
         {
+            rMut1.lock();
             while(totalBytesRead != vecSize)
             {
                 n = (int)read(receiveSocket,&rBuf1[totalBytesRead],vecSize - totalBytesRead);
                 if (n < 0) error("ERROR reading from socket");
                 totalBytesRead += n;
             }
+            rMut1.unlock();
         }
         else if(rHead == 1)
         {
+            rMut2.lock();
             while(totalBytesRead != vecSize)
             {
                 n = (int)read(receiveSocket,&rBuf2[totalBytesRead],vecSize - totalBytesRead);
                 if (n < 0) error("ERROR reading from socket");
                 totalBytesRead += n;
             }
+            rMut2.unlock();
         }
         else if(rHead == 2)
         {
+            rMut3.lock();
             while(totalBytesRead != vecSize)
             {
                 n = (int)read(receiveSocket,&rBuf3[totalBytesRead],vecSize - totalBytesRead);
                 if (n < 0) error("ERROR reading from socket");
                 totalBytesRead += n;
             }
+            rMut3.unlock();
         }
         rHead = (++rHead) % NUM_BUFFERS;
-        std::cout << "HEAD: " << rHead << std::endl;
     }
     
     
@@ -155,18 +166,21 @@ int main(int argc, char *argv[])
     //    int argc = 51717;
     //    char *argv = "localhost";
     int x, y;
+    int frame = 0;
+    unsigned char configByte = 0;
     //int displayFrame = 0;
-    int filterType = 3; //0 = none, 1 = 3x3mean, 2 = 3x3 median, 3 = 5x5 median, 4 = 3x3median 2 pass
-    int enSobelEdge = 1;
+    int filterType = 0; //0 = none, 1 = 3x3mean, 2 = 3x3 median, 3 = 5x5 median, 4 = 3x3median 2 pass
+    int enSobelEdge = 0;
     int enBinarise = 0;
     int enCombine = 0;
-    int enCombineFiltering = 1;
+    int enCombineFiltering = 0;
+    int abort = 0;
     int width = WIDTH;
     int height = HEIGHT;
     
     int sum, max;
     float mean, thresh;
-    float threshFactor = 0.25;
+    float threshFactor = 0.70;
     float fps;
     rHead = 0;
     rTail = 0;
@@ -175,8 +189,6 @@ int main(int argc, char *argv[])
     
     
     //--------------OPENCV INIT---------------//
-    unsigned char receiveBuffer[NUM_BUFFERS][WIDTH*HEIGHT];
-    unsigned char sendBuffer[WIDTH*HEIGHT];
     int vecSize = WIDTH*HEIGHT;
     std::vector<unsigned char> h_frame_in(vecSize);
     std::vector<unsigned char> h_frame_out(vecSize);
@@ -326,20 +338,13 @@ int main(int argc, char *argv[])
     while(1)
     {
         
-        //--------------------TCP RECEIVE----------------//
-        //        std::thread receiveThread(TCPReceive, receiveSocket, receiveBuffer[0]);
-        //        receiveThread.join();
-        std::cout << "wPoint: " << rHead << " rPoint: " << rTail << std::endl;
+        //----------------LOAD IMAGE FROM RECEIVE BUFFER----------------------//
         
-        
-        
-        //---------------DISPLAY FRAME------------------//
-        
-        //----------------PROCESSING----------------------//
         std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-        if(rTail == rHead) rTail = (++rTail) % NUM_BUFFERS;
+        //if(rTail == rHead) rTail = (++rTail) % NUM_BUFFERS;
         if(rTail == 0)
         {
+            rMut1.lock();
             for (y = 0; y < HEIGHT; y++)
             {
                 for (x = 0; x < WIDTH-1; x++)
@@ -347,9 +352,11 @@ int main(int argc, char *argv[])
                     h_frame_in[y*WIDTH + x] = rBuf1[y*WIDTH + x];
                 }
             }
+            rMut1.unlock();
         }
         else if(rTail == 1)
         {
+            rMut2.lock();
             for (y = 0; y < HEIGHT; y++)
             {
                 for (x = 0; x < WIDTH-1; x++)
@@ -357,9 +364,11 @@ int main(int argc, char *argv[])
                     h_frame_in[y*WIDTH + x] = rBuf2[y*WIDTH + x];
                 }
             }
+            rMut2.unlock();
         }
         else if(rTail == 2)
         {
+            rMut3.lock();
             for (y = 0; y < HEIGHT; y++)
             {
                 for (x = 0; x < WIDTH-1; x++)
@@ -367,10 +376,23 @@ int main(int argc, char *argv[])
                     h_frame_in[y*WIDTH + x] = rBuf3[y*WIDTH + x];
                 }
             }
+            rMut3.unlock();
         }
         rTail = (++rTail) % 3;
         
         
+        //----------Get and decode decode byte-------------//
+        configByte = h_frame_in[0];
+        filterType = (0x03) & configByte;
+        enSobelEdge = ((0x01 << 2) & configByte) >> 2;
+        enBinarise = ((0x01 << 3) & configByte) >> 3;
+        enCombine = ((0x01 << 4) & configByte) >> 4;
+        enCombineFiltering = ((0x01 << 5) & configByte) >> 5;
+        abort = ((0x01 << 6) & configByte) >> 6;
+        
+        if(abort) break;
+        
+        //----------------PROCESSING----------------------//
         
         queue.enqueueWriteBuffer(d_frame_in, CL_TRUE, 0, sizeof(unsigned char)*h_frame_in.size(), h_frame_in.data());
         queue.enqueueWriteBuffer(d_original_frame, CL_FALSE, 0, sizeof(unsigned char)*h_frame_in.size(), h_frame_in.data());
@@ -517,9 +539,12 @@ int main(int argc, char *argv[])
             queue.enqueueReadBuffer(d_frame_out, CL_TRUE, 0, sizeof(unsigned char)*h_frame_out.size(), h_frame_out.data());
         }
         
-        if(sHead == sTail) sHead = (++sHead) % NUM_BUFFERS;
+        //----------------SAVE IMAGE TO SEND BUFFER----------------------//
+        
+        //if(sHead == sTail) sHead = (++sHead) % NUM_BUFFERS;
         if(sHead == 0)
         {
+            sMut1.lock();
             for (y = 0; y < HEIGHT; y++)
             {
                 for (x = 0; x < WIDTH-1; x++)
@@ -527,9 +552,11 @@ int main(int argc, char *argv[])
                     sBuf1[y*WIDTH + x] = h_frame_out[y*WIDTH + x];
                 }
             }
+            sMut1.unlock();
         }
         else if(sHead == 1)
         {
+            sMut2.lock();
             for (y = 0; y < HEIGHT; y++)
             {
                 for (x = 0; x < WIDTH-1; x++)
@@ -537,9 +564,11 @@ int main(int argc, char *argv[])
                     sBuf2[y*WIDTH + x] = h_frame_out[y*WIDTH + x];
                 }
             }
+            sMut2.unlock();
         }
         else if(sHead == 2)
         {
+            sMut3.lock();
             for (y = 0; y < HEIGHT; y++)
             {
                 for (x = 0; x < WIDTH-1; x++)
@@ -547,6 +576,7 @@ int main(int argc, char *argv[])
                     sBuf3[y*WIDTH + x] = h_frame_out[y*WIDTH + x];
                 }
             }
+            sMut3.unlock();
         }
         sHead = (++sHead) % NUM_BUFFERS;
         sCount++;
@@ -555,16 +585,15 @@ int main(int argc, char *argv[])
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2-t1).count();
         fps = 1000000/duration;
         
-        std::cout << fps << std::endl;
+        //std::cout << fps << std::endl;
         
         //----------------TCP Send------------------------//
         //TCPSend();
-        
+        frame++;
         
         //------------------------------------------------//
     }
     close(receiveSocket);
-    close(sockfr);
-    while(1) x = 0;
+    close(sendSocket);
     return 0;
 }
